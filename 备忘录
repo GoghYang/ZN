@@ -1,0 +1,177 @@
+// 首先在页面引入我们需要使用的js
+<script src="./web3.min.js"></script>
+<script src="./ethereumjs-wallet-0.6.0.min.js"></script>
+
+<script>
+// 初始化web3 对象
+if (typeof web3 !== 'undefined') {
+  web3 = new Web3(web3.currentProvider);
+} else {
+  // set the provider you want from Web3.providers
+  web3 = new Web3(new  Web3.providers.HttpProvider("http://localhost:8545"));
+}
+// 使用本地测试网络的第一个账户为默认账户
+web3.eth.defaultAccount = web3.eth.accounts[0];
+
+// 从remix compile tab页中MyFreeCoin的 detail中复制 abi信息到 contract() 方法内，不懂remix的请看前面那边文章
+var mfcContract = web3.eth.contract([{...}]);
+
+//  从remix run tab页发布的合约上复制合约地址
+var contractAddress = '0x09901f8fdf2265d9be48c7877161a2f6c2e503e8';
+// 初始化我们的合约对象
+var contract = mfcContract.at(contractAddress);
+
+
+// 获取我们需要查询的以太坊地址
+var address = document.getElementById('address').value;
+if(!web3.isAddress(address)){ // 检测地址是合法的以太坊地址
+    alert("Invalid address!");
+    return ;
+}
+// 查询以太坊地址的 eth余额
+web3.eth.getBalance(address, function(err, resp){
+    if(!err){
+        eth.innerHTML = web3.fromWei(resp, 'ether').toNumber();
+    }else{
+        console.log(err);
+    }
+
+});
+// 查询MFC的余额
+contract.balanceOf(address, (err, tkns) => {
+    if (!err) {
+      mfc.innerHTML = web3.fromWei(tkns, 'ether').toNumber()
+    }else{
+        console.log(err)
+    }
+    
+  })
+</script>
+
+// 获取提token的以太坊地址
+var reciver = document.getElementById('reciver').value;
+// 提token数量
+var amount = document.getElementById('amount').value;
+if(!web3.isAddress(reciver)){ // 检测地址是否合法
+    alert("reciver: Invalid address!");
+    return ;
+}
+// 发送token，注意这里默认是从本地测试网络的第一个账户转token过去，因为我们的默认账户就是它 web3.eth.defaultAccount = web3.eth.accounts[0]; 同时在remix发布合约的时候，我们是使用第一个账户发布的，也就是说第一个账户开始拥有所有的MFC Token
+contract.transfer(reciver, web3.toWei(amount), function(err, resp){
+    if(!err){
+        console.log(resp);
+        alert('success');
+    }else{
+        console.log(err);
+    }
+})
+
+// 假设这个是我们的运营钱包地址
+var from = '0x009ddafb6dd10f2ed72dd0d0c7f291b5a0cea9eb';
+// 转token的数量
+var amount = document.getElementById('mAmount').value;
+// 提token的地址
+var to = document.getElementById('mTo').value;
+
+if(!web3.isAddress(to)){
+    alert("Invalid to address");
+    return ;
+}
+
+// 获取当前交易数，当nonce使用
+web3.eth.getTransactionCount(from, function(err, count){
+    if(!err){
+        var tcount = count;
+        // 先检查当前运营账户的余额够不够转token
+        contract.balanceOf(from, (err, tkns) => {
+            if (!err) {
+               var balance = web3.fromWei(tkns, 'ether').toNumber();
+               if(balance < amount){
+                    alert('You do not get enough mfc token!');
+                    return ;
+               }
+               amount = web3.toWei(amount);
+               // 交易信息
+               var rawTransaction = {
+                  "from": from,
+                  "nonce": "0x" + tcount.toString(16),
+                  "gasPrice": "0x003B9ACA00",
+                  "gasLimit": "0x250CA",
+                  "to": contractAddress,
+                  "value": "0x0",
+                  "data": contract.transfer(to, amount).encodeABI()
+              };
+              
+              // 运营钱包地址的私钥，需要用它来签名交易
+              var privKey = new Buffer("0x811502c101ae015b658dccbdb6626840b734c40ba229ce78877826c27ca07513", 'hex');
+              // 对交易签名
+              var tx = new ethereumjs.Tx(rawTransaction);
+              tx.sign(privKey);
+              var serializedTx = tx.serialize();
+              
+              // 发送交易到以太坊
+              web3.eth.sendSignedTransaction('0x' + serializedTx.toString('hex'),function(err, result){
+                if(!err){
+                    console.log(result);
+                }else{
+                    console.log(err);
+                }
+              });
+            }else{
+                console.log(err)
+            }
+            
+        })
+    }else{
+        console.log(error);
+    }
+
+// 上面已经引入了Ethereum-Wallet相应的js
+
+// 用户生成地址的密码
+var password = document.getElementById('password').value;
+// 初始化钱包对象
+var wallet = ethereumjs.Wallet.generate(password);
+
+// 获取私钥
+document.getElementById('gPrikey').innerHTML = "private key:" + wallet.getPrivateKeyString();
+//获取公钥
+document.getElementById('gPubkey').innerHTML = "public key:" + wallet.getPublicKeyString();
+// 获取地址
+document.getElementById('gAddress').innerHTML = "address:" + wallet.getAddressString();
+
+// 监听 转token事件
+contract.Transfer( function(err, res) {
+    if(!err){
+        console.log(res);
+        // 发送Token的地址
+        var from =  res.args._from;
+        // 接受Token的地址 所以我们只需要对比下 接受Token的地址，是我们自己的地址，那就可以给相应的用户增加充token记录了。
+        var to = res.args._to;
+        var amount = web3.fromWei(res.args._value).toNumber();
+        var html = '<p>From: '+ from+';To: '+ to+';Amount: '+amount+'</p>';
+        document.getElementById('logs').insertAdjacentHTML('beforeend', html);
+    }else{
+        console.log(err);
+    }
+})
+
+// 接受eth地址
+var etherAdress = document.getElementById('etherAdress').value;
+if(!web3.isAddress(etherAdress)){
+    alert('Invalid address');
+    return ;
+}
+// 发送交易， 转eth，这里使用的默认账户转eth，如果想使用另外的地址转也跟 转token一样，使用私钥来签名交易即可
+web3.eth.sendTransaction({
+    to: etherAdress,
+    value: '1000000000000000000'
+},function(err, result){
+    if(!err){
+        console.log(result);
+    }else{
+        console.log(err);
+    }
+})
+
+。
