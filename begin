@@ -1,0 +1,20 @@
+// https://github.com/ethereum/EIPs/issues/20
+
+// 接口标准
+  contract ERC20 {
+      function totalSupply() constant returns (uint totalSupply);   // 总发行量
+      function balanceOf(address _owner) constant returns (uint balance);
+      function transfer(address _to, uint _value) returns (bool success);   // 代币分发(注意, 这个只有合约的Creator 可以调用)
+      function transferFrom(address _from, address _to, uint _value) returns (bool success);    // 这里是拥有者和拥有者之间的代币转移
+
+      function approve(address _spender, uint _value) returns (bool success);
+      function allowance(address _owner, address _spender) constant returns (uint remaining);
+
+      event Transfer(address indexed _from, address indexed _to, uint _value);
+      event Approval(address indexed _owner, address indexed _spender, uint _value);
+
+// Token信息
+    string public constant name = "4FunCoin";
+    string public constant symbol = "4FC";
+    uint8 public constant decimals = 18;  // 
+}
